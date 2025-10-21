@@ -1,0 +1,68 @@
+# Visual Studio build and cache folders
+.vs/
+.vscode/
+ipch/
+*.aps
+*.ncb
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.opendb
+
+# Build output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+*.obj
+*.pdb
+*.idb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.exp
+
+# Intermediate or temporary files
+*.tmp
+*.temp
+*.log
+*.user
+*.tlog
+*.lastbuildstate
+*.db
+*.opendb
+*.VC.db
+*.ipch
+
+# CMake / other generators (if used later)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Windows specific
+Thumbs.db
+Desktop.ini
+
+# OpenGL library binaries (if you add them)
+*.lib
+*.dll
+
+# Ignore generated build directories for external libs
+Libraries/
+libs/
+external/
+
+# Ignore backup and autosave files
+*~
+*.bak
+*.swp
+
+# Ignore local configuration
+*.user
+*.rsuser
+*.suo
+*.vcxproj.user
+
+# Optional: ignore glad/glfw binaries if you download them manually
+C:/Libraries/
