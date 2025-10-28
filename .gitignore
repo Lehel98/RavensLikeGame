@@ -52,6 +52,7 @@ Desktop.ini
 Libraries/
 libs/
 external/
+x64/
 
 # Ignore backup and autosave files
 *~
@@ -63,6 +64,3 @@ external/
 *.rsuser
 *.suo
 *.vcxproj.user
-
-# Optional: ignore glad/glfw binaries if you download them manually
-C:/Libraries/
