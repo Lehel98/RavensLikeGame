@@ -9,12 +9,6 @@
 #include "Renderer/Texture.h"
 #include "Renderer/SpriteRenderer.h"
 
-float vertices[] = {
-     0.0f,  0.5f, 0.0f,
-    -0.5f, -0.5f, 0.0f,
-     0.5f, -0.5f, 0.0f
-};
-
 const char* vertexShaderSource = R"(
 #version 330 core
 layout (location = 0) in vec2 aPos;

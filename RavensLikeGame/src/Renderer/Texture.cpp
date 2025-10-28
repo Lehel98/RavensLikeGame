@@ -3,8 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-Texture::Texture()
-    : ID(0), Width(0), Height(0), Channels(0)
+Texture::Texture() : ID(0), Width(0), Height(0), Channels(0)
 {
 }
 

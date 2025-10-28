@@ -20,7 +20,6 @@ namespace Input
         if (key == Globals::KeyMoveRight)
             MoveRight = (action != GLFW_RELEASE);
 
-        // ESC: kilépés
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
             glfwSetWindowShouldClose(window, true);
     }
