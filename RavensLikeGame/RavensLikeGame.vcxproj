@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Game\TileMap.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Renderer\Camera.cpp" />
@@ -30,6 +31,7 @@
     <ClInclude Include="external\stb\stb_image.h" />
     <ClInclude Include="src\Core\Globals.h" />
     <ClInclude Include="src\Core\Input.h" />
+    <ClInclude Include="src\Game\TileMap.h" />
     <ClInclude Include="src\Renderer\Camera.h" />
     <ClInclude Include="src\Renderer\Shader.h" />
     <ClInclude Include="src\Renderer\SpriteRenderer.h" />

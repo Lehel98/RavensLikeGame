@@ -2,24 +2,22 @@
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
 
-class Camera
-{
+class Camera {
 public:
     Camera(float width, float height);
 
-    const glm::mat4& GetProjection() const;
-    const glm::mat4& GetView() const;
-
     void SetPosition(const glm::vec2& pos);
     void Move(const glm::vec2& delta);
-
-private:
-    glm::mat4 projection;
-    glm::mat4 view;
-    glm::vec3 position;
-    glm::vec3 up;
-    glm::vec3 target;
-    float width, height;
+    const glm::mat4& GetView() const;
+    const glm::mat4& GetProjection() const;
 
     void UpdateView();
+
+private:
+    glm::vec3 position;
+    glm::mat4 view;
+    glm::mat4 projection;
+
+    float width;
+    float height;
 };
