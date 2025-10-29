@@ -1,4 +1,4 @@
-#include <glad/glad.h>
+ï»¿#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
 
@@ -41,6 +41,62 @@ void main()
 }
 )";
 
+void CalculateDeltaTime(float& lastTime, float& deltaTime)
+{
+    float currentTime = glfwGetTime();
+    deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+}
+
+glm::vec2 CalculateMovement(const glm::vec2& position, float speed, float deltaTime)
+{
+    glm::vec2 movement(0.0f);
+
+    if (Input::MoveUp)    movement.y -= 1.0f;
+    if (Input::MoveDown)  movement.y += 1.0f;
+    if (Input::MoveLeft)  movement.x -= 1.0f;
+    if (Input::MoveRight) movement.x += 1.0f;
+    
+    if (glm::length(movement) > 0.0f)
+        movement = glm::normalize(movement);
+
+    return position + movement * speed * deltaTime;
+}
+
+void CheckCollision(const TileMap& map, glm::vec2& position, const glm::vec2& newPosition, float width, float height)
+{
+    if (map.IsAreaWalkable(newPosition.x, newPosition.y, width, height))
+    {
+        position = newPosition;
+    }
+}
+
+void UpdateCameraPosition(Camera& camera, const glm::vec2& playerPos, float deltaTime)
+{
+    glm::vec2 cameraTarget = playerPos - glm::vec2(Globals::WindowWidth / 2.0f, Globals::WindowHeight / 2.0f);
+    static glm::vec2 cameraPos(0.0f);
+
+    // 50.0f â†’ smoothness faktor (kisebb = lassabban kÃ¶vet)
+    cameraPos += (cameraTarget - cameraPos) * 50.0f * deltaTime;
+    camera.SetPosition(cameraPos);
+}
+
+void DrawFrame(Shader& shader, Camera& camera, TileMap& map, SpriteRenderer& renderer,
+    const Texture& playerTex, const glm::vec2& playerPosition, GLFWwindow* window)
+{
+    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    shader.Use();
+    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "view"), 1, GL_FALSE, &camera.GetView()[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
+
+    map.Draw(renderer);
+    renderer.DrawSprite(playerTex, playerPosition, glm::vec2(64.0f, 64.0f));
+
+    glfwSwapBuffers(window);
+}
+
 int main()
 {
     if (!glfwInit())
@@ -67,20 +123,20 @@ int main()
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
         return -1;
 
-    // Shaderek betöltése
+    // Shaderek betÃ¶ltÃ©se
     Shader shader(vertexShaderSource, fragmentShaderSource);
     Camera camera(Globals::WindowWidth, Globals::WindowHeight);
     SpriteRenderer renderer(shader);
 
-    // Pálya betöltése
+    // PÃ¡lya betÃ¶ltÃ©se
     TileMap map;
-    if (!map.Load("assets/maps/test_map.txt", 8, 5))
+    if (!map.Load("assets/maps/test_map.txt"))
     {
         std::cerr << "Map load failed!\n";
         return -1;
     }
 
-    // Játékos textúra betöltése
+    // JÃ¡tÃ©kos textÃºra betÃ¶ltÃ©se
     Texture playerTex;
     if (!playerTex.LoadFromFile("assets/textures/player/idle.png"))
     {
@@ -88,52 +144,23 @@ int main()
         return -1;
     }
 
-    glm::vec2 playerPos(100.0f, 100.0f);
+    glm::vec2 playerPosition(100.0f, 100.0f);
 
     float lastTime = glfwGetTime();
+	float deltaTime = 0.0f;
 
-    // --- Fõ játékhurok ---
+    // --- FÅ‘ jÃ¡tÃ©khurok ---
     while (!glfwWindowShouldClose(window))
     {
-        float currentTime = glfwGetTime();
-        float deltaTime = currentTime - lastTime;
-        lastTime = currentTime;
-
+        CalculateDeltaTime(lastTime, deltaTime);
         glfwPollEvents();
 
-        // --- Játékos mozgatása ---
-        float speed = 200.0f;
-        glm::vec2 movement(0.0f);
+        glm::vec2 newPosition = CalculateMovement(playerPosition, 200.0f, deltaTime);
+        CheckCollision(map, playerPosition, newPosition, 64.0f, 64.0f);
 
-        if (Input::MoveUp)    movement.y -= 1.0f;
-        if (Input::MoveDown)  movement.y += 1.0f;
-        if (Input::MoveLeft)  movement.x -= 1.0f;
-        if (Input::MoveRight) movement.x += 1.0f;
+        UpdateCameraPosition(camera, playerPosition, deltaTime);
 
-        // Normalize movement (nehogy átlósan gyorsabban mozogjon)
-        if (glm::length(movement) > 0.0f)
-            movement = glm::normalize(movement);
-
-        playerPos += movement * speed * deltaTime;
-
-        // --- Kamera követés ---
-        glm::vec2 cameraTarget = playerPos - glm::vec2(Globals::WindowWidth / 2, Globals::WindowHeight / 2);
-        static glm::vec2 cameraPos(0.0f);
-        cameraPos += (cameraTarget - cameraPos) * 5.0f * deltaTime; // 5.0 = mozgatás "simaságának" mértéke
-        camera.SetPosition(cameraPos);
-
-        // --- Rajzolás ---
-        glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        shader.Use();
-        glUniformMatrix4fv(glGetUniformLocation(shader.ID, "view"), 1, GL_FALSE, &camera.GetView()[0][0]);
-        glUniformMatrix4fv(glGetUniformLocation(shader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
-
-        map.Draw(renderer);
-        renderer.DrawSprite(playerTex, playerPos, glm::vec2(64.0f, 64.0f));
-
-        glfwSwapBuffers(window);
+        DrawFrame(shader, camera, map, renderer, playerTex, playerPosition, window);
     }
 
     playerTex.Delete();
