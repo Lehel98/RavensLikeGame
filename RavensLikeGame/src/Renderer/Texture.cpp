@@ -3,16 +3,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-Texture::Texture() : ID(0), Width(0), Height(0), Channels(0)
-{
-}
+Texture::Texture() : ID(0), Width(0), Height(0), Channels(0) {}
 
 Texture::~Texture() {
     Delete();
 }
 
 bool Texture::LoadFromFile(const std::string& path) {
-    stbi_set_flip_vertically_on_load(true);
+    stbi_set_flip_vertically_on_load(false);
     unsigned char* data = stbi_load(path.c_str(), &Width, &Height, &Channels, 0);
     if (!data) {
         std::cerr << "Failed to load texture: " << path << std::endl;
@@ -60,8 +58,9 @@ void Texture::Unbind() const {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void Texture::Delete() const {
+void Texture::Delete() {
     if (ID) {
         glDeleteTextures(1, &ID);
+        ID = 0;
     }
 }

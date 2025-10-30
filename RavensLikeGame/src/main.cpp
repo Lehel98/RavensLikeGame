@@ -65,10 +65,19 @@ glm::vec2 CalculateMovement(const glm::vec2& position, float speed, float deltaT
 
 void CheckCollision(const TileMap& map, glm::vec2& position, const glm::vec2& newPosition, float width, float height)
 {
-    if (map.IsAreaWalkable(newPosition.x, newPosition.y, width, height))
-    {
-        position = newPosition;
-    }
+    glm::vec2 testPos = position;
+
+    // --- X irány ---
+    glm::vec2 testX = glm::vec2(newPosition.x, position.y);
+    if (map.IsAreaWalkable(testX.x, testX.y, width, height))
+        testPos.x = testX.x;
+
+    // --- Y irány ---
+    glm::vec2 testY = glm::vec2(testPos.x, newPosition.y);
+    if (map.IsAreaWalkable(testY.x, testY.y, width, height))
+        testPos.y = testY.y;
+
+    position = testPos;
 }
 
 void UpdateCameraPosition(Camera& camera, const glm::vec2& playerPos, float deltaTime)
@@ -92,7 +101,7 @@ void DrawFrame(Shader& shader, Camera& camera, TileMap& map, SpriteRenderer& ren
     glUniformMatrix4fv(glGetUniformLocation(shader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
 
     map.Draw(renderer);
-    renderer.DrawSprite(playerTex, playerPosition, glm::vec2(64.0f, 64.0f));
+    renderer.DrawSprite(playerTex, playerPosition, glm::vec2(32.0f, 32.0f));
 
     glfwSwapBuffers(window);
 }
@@ -130,7 +139,7 @@ int main()
 
     // Pálya betöltése
     TileMap map;
-    if (!map.Load("assets/maps/test_map.txt"))
+    if (!map.Load("assets/maps/map2.txt"))
     {
         std::cerr << "Map load failed!\n";
         return -1;
@@ -144,7 +153,7 @@ int main()
         return -1;
     }
 
-    glm::vec2 playerPosition(100.0f, 100.0f);
+    glm::vec2 playerPosition(64.0f, 64.0f);
 
     float lastTime = glfwGetTime();
 	float deltaTime = 0.0f;
@@ -155,8 +164,7 @@ int main()
         CalculateDeltaTime(lastTime, deltaTime);
         glfwPollEvents();
 
-        glm::vec2 newPosition = CalculateMovement(playerPosition, 200.0f, deltaTime);
-        CheckCollision(map, playerPosition, newPosition, 64.0f, 64.0f);
+        CheckCollision(map, playerPosition, CalculateMovement(playerPosition, 200.0f, deltaTime), 32.0f, 32.0f);
 
         UpdateCameraPosition(camera, playerPosition, deltaTime);
 
