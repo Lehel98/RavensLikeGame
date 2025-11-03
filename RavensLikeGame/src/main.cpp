@@ -41,6 +41,39 @@ void main()
 }
 )";
 
+GLFWwindow* CreateGameWindow()
+{
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+    glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+    glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+    glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+    glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+
+    GLFWwindow* window = glfwCreateWindow(
+        mode->width,
+        mode->height,
+        Globals::WindowTitle,
+        primaryMonitor,
+        nullptr
+    );
+
+    if (!window)
+    {
+        glfwTerminate();
+        return nullptr;
+    }
+
+    glfwMakeContextCurrent(window);
+    glfwSetKeyCallback(window, Input::KeyCallback);
+    return window;
+}
+
 void CalculateDeltaTime(float& lastTime, float& deltaTime)
 {
     float currentTime = glfwGetTime();
@@ -111,23 +144,9 @@ int main()
     if (!glfwInit())
         return -1;
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    GLFWwindow* window = glfwCreateWindow(
-        Globals::WindowWidth, Globals::WindowHeight,
-        Globals::WindowTitle, nullptr, nullptr
-    );
-
+    GLFWwindow* window = CreateGameWindow();
     if (!window)
-    {
-        glfwTerminate();
         return -1;
-    }
-
-    glfwMakeContextCurrent(window);
-    glfwSetKeyCallback(window, Input::KeyCallback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
         return -1;

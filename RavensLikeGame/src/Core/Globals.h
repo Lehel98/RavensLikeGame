@@ -3,8 +3,8 @@
 
 namespace Globals
 {
-    constexpr unsigned int WindowWidth = 800;
-    constexpr unsigned int WindowHeight = 600;
+    constexpr unsigned int WindowWidth = 1800;
+    constexpr unsigned int WindowHeight = 1200;
     constexpr const char* WindowTitle = "RavensLikeGame";
 
     inline int KeyMoveUp = GLFW_KEY_W;
