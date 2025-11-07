@@ -1,0 +1,33 @@
+void UIRenderer::InitRenderData()
+{
+    // skew arány: ha skippet pixelben adsz meg (pl. 15px), és alap barWidth = 300px,
+    // akkor a normalizált skew = 15 / 300 = 0.05. Itt használjunk fix arányt (pl. 0.05).
+    float s = 15.0f / 300.0f; // ha később változik a barWidth, módosíthatod az Init-et is, vagy
+                              // számítsd át dinamikusan modell transzformban (de ez egyszerű és stabil)
+
+    // Két háromszög (6 vertex), minden vertex: pos.x, pos.y, tex.u, tex.v
+    float vertices[] = {
+        // első háromszög
+        s,    0.0f,  0.0f, 0.0f,   // bal-alsó
+        0.0f, 1.0f,  0.0f, 1.0f,   // bal-felső
+        1.0f, 1.0f,  1.0f, 1.0f,   // jobb-felső
+
+        // második háromszög
+        s,    0.0f,  0.0f, 0.0f,   // bal-alsó
+        1.0f, 1.0f,  1.0f, 1.0f,   // jobb-felső
+        1.0f + s, 0.0f, 1.0f, 0.0f // jobb-alsó (jobb+skew)
+    };
+
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // a vertex shadered elvárja: location 0 = vec2 aPos; location 1 = vec2 aTexCoord;
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
