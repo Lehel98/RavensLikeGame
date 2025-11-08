@@ -1,4 +1,5 @@
 #include "Shader.h"
+#include <gtc/type_ptr.hpp>
 #include <iostream>
 
 Shader::Shader(const char* vertexSource, const char* fragmentSource)
@@ -51,4 +52,19 @@ void Shader::Use()
 void Shader::Delete()
 {
     glDeleteProgram(ID);
+}
+
+void Shader::SetMat4(const std::string& name, const glm::mat4& mat) const
+{
+    glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(mat));
+}
+
+void Shader::SetVec4(const std::string& name, const glm::vec4& vec) const
+{
+    glUniform4fv(glGetUniformLocation(ID, name.c_str()), 1, glm::value_ptr(vec));
+}
+
+void Shader::SetInt(const std::string& name, int value) const
+{
+    glUniform1i(glGetUniformLocation(ID, name.c_str()), value);
 }

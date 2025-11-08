@@ -1,0 +1,147 @@
+﻿#include "IsoRenderer.h"
+#include <glad/glad.h>
+#include <stb_image.h>
+#include <gtc/matrix_transform.hpp>
+#include <gtc/type_ptr.hpp>
+#include "../Core/Globals.h"
+#include <iostream>
+#include <algorithm>
+
+IsoRenderer::IsoRenderer(Shader& shader, const std::string& texturePath)
+    : shader(shader)
+{
+    LoadTexture(texturePath);
+    InitRenderData();
+
+    projection = glm::mat4(1.0f);
+    view = glm::mat4(1.0f);
+}
+
+IsoRenderer::~IsoRenderer()
+{
+    glDeleteVertexArrays(1, &vao);
+    glDeleteBuffers(1, &vbo);
+    glDeleteTextures(1, &textureID);
+}
+
+void IsoRenderer::SetProjection(const glm::mat4& proj)
+{
+    projection = proj;
+}
+
+void IsoRenderer::SetView(const glm::mat4& v)
+{
+    view = v;
+}
+
+void IsoRenderer::LoadTexture(const std::string& path)
+{
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    int width, height, nrChannels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load(path.c_str(), &width, &height, &nrChannels, 4);
+    if (!data) {
+        std::cerr << "Failed to load texture: " << path << std::endl;
+        return;
+    }
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    stbi_image_free(data);
+}
+
+void IsoRenderer::InitRenderData()
+{
+    float vertices[] = {
+        // positions       // texCoords
+        0.0f, 0.0f,         0.0f, 0.0f,
+        tileWidth, 0.0f,    1.0f, 0.0f,
+        tileWidth, tileHeight, 1.0f, 1.0f,
+        0.0f, tileHeight,   0.0f, 1.0f
+    };
+    unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
+
+    unsigned int ebo;
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
+
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
+
+void IsoRenderer::DrawTile(int tileIndex, const glm::vec2& worldPosition)
+{
+    shader.Use();
+    shader.SetMat4("projection", projection);
+    shader.SetMat4("view", view);
+
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glBindVertexArray(vao);
+
+    const float atlasPixelWidth = (float)(tileWidth * tileCount);
+
+    const float textureUStart = (tileIndex * tileWidth) / atlasPixelWidth;
+    const float textureUEnd = ((tileIndex + 1) * tileWidth) / atlasPixelWidth;
+    const float textureVStart = 0.0f;
+    const float textureVEnd = 1.0f;
+    shader.SetVec4("uvRect", glm::vec4(textureUStart, textureVStart, textureUEnd, textureVEnd));
+
+    glm::mat4 model(1.0f);
+    model = glm::translate(model, glm::vec3(worldPosition.x, worldPosition.y, 0.0f));
+    shader.SetMat4("model", model);
+
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
+{
+    const int rows = (int)mapData.size();
+    const int cols = (int)mapData[0].size();
+
+    // Térkép középre igazítása (rombusz-tetők befoglalója alapján)
+    const float mapWidth = (cols + rows) * (tileWidth * 0.5f);
+    const float mapHeight = (cols + rows) * (tileVisibleHeight * 0.5f);
+    const glm::vec2 origin(
+        Globals::WindowWidth * 0.5f - mapWidth * 0.5f + tileWidth * 0.5f,
+        Globals::WindowHeight * 0.5f - mapHeight * 0.5f
+    );
+
+    const int maxS = rows + cols - 2;
+    for (int s = maxS; s >= 0; --s)
+    {
+        const int xBeg = std::max(0, s - (rows - 1));
+        const int xEnd = std::min(cols - 1, s);
+
+        for (int x = xEnd; x >= xBeg; --x)
+        {
+            const int y = s - x;
+            const int tile = mapData[y][x];
+            if (tile < 0) continue;
+
+            const float apexX = origin.x + (x - y) * (tileWidth * 0.5f);
+            const float apexY = origin.y + (x + y) * (tileVisibleHeight * 0.5f);
+            const glm::vec2 topLeft(apexX - tileWidth * 0.5f, apexY);
+
+            DrawTile(tile, topLeft);
+        }
+    }
+}

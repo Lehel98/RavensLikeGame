@@ -24,6 +24,7 @@
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\Renderer\Camera.cpp" />
+    <ClCompile Include="src\Renderer\IsoRenderer.cpp" />
     <ClCompile Include="src\Renderer\Shader.cpp" />
     <ClCompile Include="src\Renderer\SpriteRenderer.cpp" />
     <ClCompile Include="src\Renderer\Texture.cpp" />
@@ -35,6 +36,7 @@
     <ClInclude Include="src\Core\UIRenderer.h" />
     <ClInclude Include="src\Game\TileMap.h" />
     <ClInclude Include="src\Renderer\Camera.h" />
+    <ClInclude Include="src\Renderer\IsoRenderer.h" />
     <ClInclude Include="src\Renderer\Shader.h" />
     <ClInclude Include="src\Renderer\SpriteRenderer.h" />
     <ClInclude Include="src\Renderer\Texture.h" />

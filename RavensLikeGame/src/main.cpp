@@ -1,6 +1,8 @@
 ﻿#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 #include "Core/Globals.h"
 #include "Core/Input.h"
@@ -8,55 +10,20 @@
 #include "Renderer/Shader.h"
 #include "Renderer/Camera.h"
 #include "Renderer/Texture.h"
-#include "Renderer/SpriteRenderer.h"
-#include "Game/TileMap.h"
+#include "Renderer/IsoRenderer.h"
 
-const char* vertexShaderSource = R"(
-#version 330 core
-layout (location = 0) in vec2 aPos;
-layout (location = 1) in vec2 aTexCoord;
-
-out vec2 TexCoord;
-
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-uniform bool useView;
-
-void main()
+std::string LoadShaderSource(const std::string& filePath)
 {
-    TexCoord = aTexCoord;
-    if (useView)
-        gl_Position = projection * view * model * vec4(aPos, 0.0, 1.0);
-    else
-        gl_Position = projection * model * vec4(aPos, 0.0, 1.0);
-}
-)";
-
-const char* fragmentShaderSource = R"(
-#version 330 core
-in vec2 TexCoord;
-out vec4 FragColor;
-
-uniform sampler2D sprite;     // textúra
-uniform vec3 spriteColor;     // egyszínű elemekhez (UI)
-uniform bool useColorOnly;    // true = UI színezett elem, false = textúrázott elem
-
-void main()
-{
-    if (useColorOnly)
+    std::ifstream file(filePath);
+    if (!file.is_open())
     {
-        // Egyszínű (pl. UI, health bar)
-        FragColor = vec4(spriteColor, 1.0);
+        std::cerr << "Failed to open shader file: " << filePath << std::endl;
+        return "";
     }
-    else
-    {
-        // Textúrázott (pl. pálya, karakter)
-        FragColor = texture(sprite, TexCoord);
-    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
 }
-)";
-
 
 GLFWwindow* CreateGameWindow()
 {
@@ -72,21 +39,21 @@ GLFWwindow* CreateGameWindow()
     glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
     glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 
-    /*GLFWwindow* window = glfwCreateWindow(
+    GLFWwindow* window = glfwCreateWindow(
         Globals::WindowWidth,
         Globals::WindowHeight,
         Globals::WindowTitle,
         nullptr,
         nullptr
-    );*/
+    );
 
-    GLFWwindow* window = glfwCreateWindow(
+    /*GLFWwindow* window = glfwCreateWindow(
         mode->width,
         mode->height,
         Globals::WindowTitle,
         primaryMonitor,
         nullptr
-    );
+    );*/
 
     if (!window)
     {
@@ -121,23 +88,6 @@ glm::vec2 CalculateMovement(const glm::vec2& position, float speed, float deltaT
     return position + movement * speed * deltaTime;
 }
 
-void CheckCollision(const TileMap& map, glm::vec2& position, const glm::vec2& newPosition, float width, float height)
-{
-    glm::vec2 testPos = position;
-
-    // --- X irány ---
-    glm::vec2 testX = glm::vec2(newPosition.x, position.y);
-    if (map.IsAreaWalkable(testX.x, testX.y, width, height))
-        testPos.x = testX.x;
-
-    // --- Y irány ---
-    glm::vec2 testY = glm::vec2(testPos.x, newPosition.y);
-    if (map.IsAreaWalkable(testY.x, testY.y, width, height))
-        testPos.y = testY.y;
-
-    position = testPos;
-}
-
 void UpdateCameraPosition(Camera& camera, const glm::vec2& playerPos, float deltaTime)
 {
     glm::vec2 cameraTarget = playerPos - glm::vec2(Globals::WindowWidth / 2.0f, Globals::WindowHeight / 2.0f);
@@ -146,20 +96,6 @@ void UpdateCameraPosition(Camera& camera, const glm::vec2& playerPos, float delt
     // 50.0f → smoothness faktor (kisebb = lassabban követ)
     cameraPos += (cameraTarget - cameraPos) * 50.0f * deltaTime;
     camera.SetPosition(cameraPos);
-}
-
-void DrawFrame(Shader& shader, Camera& camera, TileMap& map, SpriteRenderer& renderer,
-    const Texture& playerTex, const glm::vec2& playerPosition, GLFWwindow* window)
-{
-    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    shader.Use();
-    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "view"), 1, GL_FALSE, &camera.GetView()[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
-
-    map.Draw(renderer);
-    renderer.DrawSprite(playerTex, playerPosition, glm::vec2(32.0f, 32.0f));
 }
 
 int main()
@@ -178,57 +114,76 @@ int main()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Shaderek betöltése
-    Shader shader(vertexShaderSource, fragmentShaderSource);
-    Camera camera(Globals::WindowWidth, Globals::WindowHeight);
-    SpriteRenderer renderer(shader);
-    UIRenderer uiRenderer(shader);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glClearDepth(1.0);
 
-    // Pálya betöltése
-    TileMap map;
-    if (!map.Load("assets/maps/map2.txt"))
-    {
-        std::cerr << "Map load failed!\n";
-        return -1;
-    }
+    // --- Shader betöltése fájlból ---
+    std::string vertexCode = LoadShaderSource("assets/shaders/iso.vert");
+    std::string fragmentCode = LoadShaderSource("assets/shaders/iso.frag");
 
-    // Játékos textúra betöltése
-    Texture playerTex;
-    if (!playerTex.LoadFromFile("assets/textures/player/idle.png"))
-    {
-        std::cerr << "Player texture load failed!\n";
-        return -1;
-    }
+    Shader isoShader(vertexCode.c_str(), fragmentCode.c_str());
 
-    int maxHealth = 100;
-    int currentHealth = 100;
+    isoShader.Use();
+    isoShader.SetInt("textureAtlas", 0);
 
-    glm::vec2 playerPosition(64.0f, 64.0f);
+    // --- Izometrikus renderer inicializálás ---
+    IsoRenderer isoRenderer(isoShader, "assets/textures/tiles/tiles.png");
+    
+    glm::mat4 projection = glm::ortho(0.0f, (float)Globals::WindowWidth, 0.0f, (float)Globals::WindowHeight, -1.0f, 1.0f);
+    glm::mat4 view = glm::mat4(1.0f);
+    isoRenderer.SetProjection(projection);
+    isoRenderer.SetView(view);
+
+    std::vector<std::vector<int>> mapData = {
+        { 0, 1, 2 },
+        { 1, 2, 0 },
+        { 2, 0, 1 }
+    };
+
+    Shader uiShader(
+        LoadShaderSource("assets/shaders/sprite.vert").c_str(),
+        LoadShaderSource("assets/shaders/sprite.frag").c_str());
+    UIRenderer uiRenderer(uiShader);
+    int maxHealth = 100, currentHealth = 100;
 
     float lastTime = glfwGetTime();
-	float deltaTime = 0.0f;
+    float deltaTime = 0.0f;
 
-    // --- Fő játékhurok ---
     while (!glfwWindowShouldClose(window))
     {
         CalculateDeltaTime(lastTime, deltaTime);
         glfwPollEvents();
 
-        if (Input::MoveDown && currentHealth > 0)
-            currentHealth -= 1;
+        static float mHoldAccum = 0.0f;
 
-        CheckCollision(map, playerPosition, CalculateMovement(playerPosition, 200.0f, deltaTime), 32.0f, 32.0f);
+        const float kDrainIntervalSeconds = 0.10f;
 
-        UpdateCameraPosition(camera, playerPosition, deltaTime);
+        if (glfwGetKey(window, Globals::DecreaseHealth) == GLFW_PRESS) {
+            mHoldAccum += deltaTime;
+            while (mHoldAccum >= kDrainIntervalSeconds && currentHealth > 0) {
+                --currentHealth;
+                mHoldAccum -= kDrainIntervalSeconds;
+            }
+        }
+        else {
+            mHoldAccum = 0.0f;
+        }
 
-        DrawFrame(shader, camera, map, renderer, playerTex, playerPosition, window);
+        glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glEnable(GL_DEPTH_TEST);
+        isoRenderer.DrawMap(mapData);
+
+        glDisable(GL_DEPTH_TEST);
         uiRenderer.DrawHealthBar(currentHealth, maxHealth);
 
         glfwSwapBuffers(window);
     }
 
-    playerTex.Delete();
-    shader.Delete();
+    isoShader.Delete();
+    uiShader.Delete();
     glfwTerminate();
     return 0;
 }

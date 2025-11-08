@@ -1,25 +1,42 @@
-void UIRenderer::InitRenderData() {
-    float vertices[] = {
-        // pos      // tex
-        0.0f, 1.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 0.0f,
+void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
+{
+    const int rows = (int)mapData.size();
+    const int cols = (int)mapData[0].size();
 
-        0.0f, 1.0f, 0.0f, 1.0f,
-        1.0f, 1.0f, 1.0f, 1.0f,
-        1.0f, 0.0f, 1.0f, 0.0f
-    };
+    const float surfaceWidth = (float)tileWidth;           // 693
+    const float surfaceHeight = (float)tileVisibleHeight;   // 400
 
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    // Térkép középre igazítása (rombusz-tetők befoglalója alapján)
+    const float mapWidth = (cols + rows) * (surfaceWidth * 0.5f);
+    const float mapHeight = (cols + rows) * (surfaceHeight * 0.5f);
+    const glm::vec2 origin(
+        Globals::WindowWidth * 0.5f - mapWidth * 0.5f + surfaceWidth * 0.5f, // +W/2 mert top-left kell majd
+        Globals::WindowHeight * 0.5f - mapHeight * 0.5f
+    );
 
-    glBindVertexArray(quadVAO);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    // Diagonálonként: s = x + y
+    const int maxS = rows + cols - 2;
+    for (int s = 0; s <= maxS; ++s)
+    {
+        // adott átlón x tartomány
+        const int xBeg = std::max(0, s - (rows - 1));
+        const int xEnd = std::min(cols - 1, s);
+
+        for (int x = xBeg; x <= xEnd; ++x)
+        {
+            const int y = s - x;
+            const int tile = mapData[y][x];
+            if (tile < 0) continue;
+
+            // apex (rombusz-csúcs) → kép bal-felső sarka
+            const float apexX = origin.x + (x - y) * (surfaceWidth * 0.5f);
+            const float apexY = origin.y + (x + y) * (surfaceHeight * 0.5f);
+            const glm::vec2 topLeft(apexX - surfaceWidth * 0.5f, apexY);
+
+            // kis z-bias, hogy a depth test is korrekt legyen
+            const float zDepth = -0.001f * (float)s;
+
+            DrawTile(tile, topLeft, zDepth);
+        }
+    }
 }

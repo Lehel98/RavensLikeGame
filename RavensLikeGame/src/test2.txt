@@ -1,33 +1,50 @@
-void UIRenderer::InitRenderData()
+void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
 {
-    // skew arány: ha skippet pixelben adsz meg (pl. 15px), és alap barWidth = 300px,
-    // akkor a normalizált skew = 15 / 300 = 0.05. Itt használjunk fix arányt (pl. 0.05).
-    float s = 15.0f / 300.0f; // ha később változik a barWidth, módosíthatod az Init-et is, vagy
-                              // számítsd át dinamikusan modell transzformban (de ez egyszerű és stabil)
+    const int rows = (int)mapData.size();
+    const int cols = (int)mapData[0].size();
 
-    // Két háromszög (6 vertex), minden vertex: pos.x, pos.y, tex.u, tex.v
-    float vertices[] = {
-        // első háromszög
-        s,    0.0f,  0.0f, 0.0f,   // bal-alsó
-        0.0f, 1.0f,  0.0f, 1.0f,   // bal-felső
-        1.0f, 1.0f,  1.0f, 1.0f,   // jobb-felső
+    // pálya középre igazítása (változatlanul)
+    float mapW = cols * (tileWidth * 0.5f);
+    float mapH = rows * (tileVisibleHeight * 0.5f);
+    glm::vec2 offset(
+        Globals::WindowWidth * 0.5f - mapW * 0.5f,
+        Globals::WindowHeight * 0.5f - mapH * 0.5f
+    );
 
-        // második háromszög
-        s,    0.0f,  0.0f, 0.0f,   // bal-alsó
-        1.0f, 1.0f,  1.0f, 1.0f,   // jobb-felső
-        1.0f + s, 0.0f, 1.0f, 0.0f // jobb-alsó (jobb+skew)
-    };
+    shader.Use();
+    shader.SetMat4("projection", projection);
+    shader.SetMat4("view", view);
+    shader.SetInt("textureAtlas", 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glBindVertexArray(vao);
 
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    // a vertex shadered elvárja: location 0 = vec2 aPos; location 1 = vec2 aTexCoord;
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    // DIAGONÁLIS sorrend: s = x+y növekvő
+    for (int s = 0; s <= rows + cols - 2; ++s) {
+        int y0 = std::max(0, s - (cols - 1));
+        int y1 = std::min(rows - 1, s);
+        for (int y = y0; y <= y1; ++y) {
+            int x = s - y;
+            int tile = mapData[y][x];
+            if (tile < 0) continue;
+
+            // izometrikus elhelyezés
+            glm::vec2 pos;
+            pos.x = offset.x + (x - y) * (tileWidth * 0.5f);
+            pos.y = offset.y + (x + y) * (tileVisibleHeight * 0.5f);
+
+            // atlasz UV
+            float u0 = (tile * tileWidth) / (float)(tileWidth * tileCount);
+            float u1 = ((tile + 1) * tileWidth) / (float)(tileWidth * tileCount);
+            shader.SetVec4("uvRect", glm::vec4(u0, 0.0f, u1, 1.0f));
+
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, glm::vec3(pos, 0.0f));
+            shader.SetMat4("model", model);
+
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+    }
+
     glBindVertexArray(0);
 }

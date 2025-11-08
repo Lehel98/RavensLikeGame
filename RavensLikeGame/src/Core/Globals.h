@@ -11,4 +11,5 @@ namespace Globals
     inline int KeyMoveDown = GLFW_KEY_S;
     inline int KeyMoveLeft = GLFW_KEY_A;
     inline int KeyMoveRight = GLFW_KEY_D;
+    inline int DecreaseHealth = GLFW_KEY_M;
 }
