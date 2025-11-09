@@ -4,7 +4,6 @@ Camera::Camera(float width, float height)
     : width(width), height(height),
     position(0.0f, 0.0f, 0.0f)
 {
-    // Ortografikus kamera (2D)
     projection = glm::ortho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
     UpdateView();
 }

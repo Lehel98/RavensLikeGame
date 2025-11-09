@@ -10,6 +10,7 @@
 #include "Renderer/Shader.h"
 #include "Renderer/Camera.h"
 #include "Renderer/Texture.h"
+#include "Renderer/SpriteRenderer.h"
 #include "Renderer/IsoRenderer.h"
 
 std::string LoadShaderSource(const std::string& filePath)
@@ -77,8 +78,8 @@ glm::vec2 CalculateMovement(const glm::vec2& position, float speed, float deltaT
 {
     glm::vec2 movement(0.0f);
 
-    if (Input::MoveUp)    movement.y -= 1.0f;
-    if (Input::MoveDown)  movement.y += 1.0f;
+    if (Input::MoveUp)    movement.y += 1.0f;
+    if (Input::MoveDown)  movement.y -= 1.0f;
     if (Input::MoveLeft)  movement.x -= 1.0f;
     if (Input::MoveRight) movement.x += 1.0f;
     
@@ -88,14 +89,70 @@ glm::vec2 CalculateMovement(const glm::vec2& position, float speed, float deltaT
     return position + movement * speed * deltaTime;
 }
 
-void UpdateCameraPosition(Camera& camera, const glm::vec2& playerPos, float deltaTime)
+void UpdateCameraFollow(Camera& camera, const glm::vec2& playerPos, float deltaTime, float smoothness = Globals::CameraFollowSmoothness)
 {
-    glm::vec2 cameraTarget = playerPos - glm::vec2(Globals::WindowWidth / 2.0f, Globals::WindowHeight / 2.0f);
-    static glm::vec2 cameraPos(0.0f);
+    const glm::vec2 halfViewport(Globals::WindowWidth * 0.5f, Globals::WindowHeight * 0.5f);
+    const glm::vec2 target = playerPos - halfViewport;
 
-    // 50.0f → smoothness faktor (kisebb = lassabban követ)
-    cameraPos += (cameraTarget - cameraPos) * 50.0f * deltaTime;
-    camera.SetPosition(cameraPos);
+    if (smoothness <= 0.0f) {
+        camera.SetPosition(target);
+        return;
+    }
+
+    static glm::vec2 camPos = glm::vec2(0.0f);
+    camPos += (target - camPos) * smoothness * deltaTime;
+    camera.SetPosition(camPos);
+}
+
+void DrainHealthOnKey(GLFWwindow* window, float deltaTime, int& currentHealth,
+    int key = Globals::DecreaseHealth, float intervalSec = 0.10f)
+{
+    static float accum = 0.0f;
+    if (glfwGetKey(window, key) == GLFW_PRESS) {
+        accum += deltaTime;
+        while (accum >= intervalSec && currentHealth > 0) {
+            --currentHealth;
+            accum -= intervalSec;
+        }
+    }
+    else {
+        accum = 0.0f;
+    }
+}
+
+void PrepareSpriteShaderForWorld(Shader& shader, const Camera& camera)
+{
+    shader.Use();
+    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "view"), 1, GL_FALSE, &camera.GetView()[0][0]);
+    glUniform1i(glGetUniformLocation(shader.ID, "useView"), 1);
+    glUniform1i(glGetUniformLocation(shader.ID, "useColorOnly"), 0);
+    glUniform1i(glGetUniformLocation(shader.ID, "sprite"), 0);
+}
+
+void DrawPlayerSprite(SpriteRenderer& renderer, const Texture& tex,
+    const glm::vec2& playerPos, const glm::vec2& size)
+{
+    const glm::vec2 drawPos = playerPos - size * 0.5f;
+    renderer.DrawSprite(tex, drawPos, size);
+}
+
+void BeginFrame()
+{
+    glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void RenderWorld(IsoRenderer& isoRenderer, const std::vector<std::vector<int>>& mapData)
+{
+    glEnable(GL_DEPTH_TEST);
+    isoRenderer.DrawMap(mapData);
+}
+
+void RenderUI(UIRenderer& ui, int currentHealth, int maxHealth)
+{
+    glDisable(GL_DEPTH_TEST);
+    ui.DrawHealthBar(currentHealth, maxHealth);
 }
 
 int main()
@@ -136,15 +193,29 @@ int main()
     isoRenderer.SetView(view);
 
     std::vector<std::vector<int>> mapData = {
-        { 0, 1, 2 },
-        { 1, 2, 0 },
-        { 2, 0, 1 }
+        { 0, 1, 2, 0 },
+        { 1, 2, 0, 0 },
+        { 2, 0, 1, 0 },
+        { 0, 0, 0, 0 }
     };
 
     Shader uiShader(
         LoadShaderSource("assets/shaders/sprite.vert").c_str(),
         LoadShaderSource("assets/shaders/sprite.frag").c_str());
     UIRenderer uiRenderer(uiShader);
+
+    Texture playerTex;
+    if (!playerTex.LoadFromFile("assets/textures/player/idle.png")) {
+        std::cerr << "Player texture load failed!\n";
+        return -1;
+    }
+    SpriteRenderer playerRenderer(uiShader);
+
+    Camera camera((float)Globals::WindowWidth, (float)Globals::WindowHeight);
+    glm::vec2 playerPosition(0.0f, 0.0f);
+    glm::vec2 playerSize((float)playerTex.Width, (float)playerTex.Height);
+    const float playerSpeed = 300.0f;
+
     int maxHealth = 100, currentHealth = 100;
 
     float lastTime = glfwGetTime();
@@ -155,29 +226,20 @@ int main()
         CalculateDeltaTime(lastTime, deltaTime);
         glfwPollEvents();
 
-        static float mHoldAccum = 0.0f;
+        playerPosition = CalculateMovement(playerPosition, playerSpeed, deltaTime);
 
-        const float kDrainIntervalSeconds = 0.10f;
+        UpdateCameraFollow(camera, playerPosition, deltaTime);
+        isoRenderer.SetView(camera.GetView());
 
-        if (glfwGetKey(window, Globals::DecreaseHealth) == GLFW_PRESS) {
-            mHoldAccum += deltaTime;
-            while (mHoldAccum >= kDrainIntervalSeconds && currentHealth > 0) {
-                --currentHealth;
-                mHoldAccum -= kDrainIntervalSeconds;
-            }
-        }
-        else {
-            mHoldAccum = 0.0f;
-        }
+        DrainHealthOnKey(window, deltaTime, currentHealth);
 
-        glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        BeginFrame();
+        RenderWorld(isoRenderer, mapData);
 
-        glEnable(GL_DEPTH_TEST);
-        isoRenderer.DrawMap(mapData);
+        PrepareSpriteShaderForWorld(uiShader, camera);
+        DrawPlayerSprite(playerRenderer, playerTex, playerPosition, playerSize);
 
-        glDisable(GL_DEPTH_TEST);
-        uiRenderer.DrawHealthBar(currentHealth, maxHealth);
+        RenderUI(uiRenderer, currentHealth, maxHealth);
 
         glfwSwapBuffers(window);
     }

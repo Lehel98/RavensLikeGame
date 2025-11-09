@@ -3,6 +3,8 @@
 
 namespace Globals
 {
+    inline float CameraFollowSmoothness = 50.0f;
+
     constexpr unsigned int WindowWidth = 1200;
     constexpr unsigned int WindowHeight = 800;
     constexpr const char* WindowTitle = "RavensLikeGame";
