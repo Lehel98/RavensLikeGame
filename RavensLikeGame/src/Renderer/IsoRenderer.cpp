@@ -57,12 +57,15 @@ void IsoRenderer::LoadTexture(const std::string& path)
 
 void IsoRenderer::InitRenderData()
 {
+    const float width = ScaledWidth();
+    const float height = ScaledHeight();
+
     float vertices[] = {
         // positions       // texCoords
         0.0f, 0.0f,         0.0f, 0.0f,
-        tileWidth, 0.0f,    1.0f, 0.0f,
-        tileWidth, tileHeight, 1.0f, 1.0f,
-        0.0f, tileHeight,   0.0f, 1.0f
+        width, 0.0f,    1.0f, 0.0f,
+        width, height, 1.0f, 1.0f,
+        0.0f, height,   0.0f, 1.0f
     };
     unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
 
@@ -117,11 +120,14 @@ void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
     const int rows = (int)mapData.size();
     const int cols = (int)mapData[0].size();
 
+	const float width = ScaledWidth();
+	const float visibleHeight = ScaledVisibleHeight();
+
     // Térkép középre igazítása (rombusz-tetők befoglalója alapján)
-    const float mapWidth = (cols + rows) * (tileWidth * 0.5f);
-    const float mapHeight = (cols + rows) * (tileVisibleHeight * 0.5f);
+    const float mapWidth = (cols + rows) * (width * 0.5f);
+    const float mapHeight = (cols + rows) * (visibleHeight * 0.5f);
     const glm::vec2 origin(
-        Globals::WindowWidth * 0.5f - mapWidth * 0.5f + tileWidth * 0.5f,
+        Globals::WindowWidth * 0.5f - mapWidth * 0.5f + width * 0.5f,
         Globals::WindowHeight * 0.5f - mapHeight * 0.5f
     );
 
@@ -137,9 +143,9 @@ void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
             const int tile = mapData[y][x];
             if (tile < 0) continue;
 
-            const float apexX = origin.x + (x - y) * (tileWidth * 0.5f);
-            const float apexY = origin.y + (x + y) * (tileVisibleHeight * 0.5f);
-            const glm::vec2 topLeft(apexX - tileWidth * 0.5f, apexY);
+            const float apexX = origin.x + (x - y) * (width * 0.5f);
+            const float apexY = origin.y + (x + y) * (visibleHeight * 0.5f);
+            const glm::vec2 topLeft(apexX - width * 0.5f, apexY);
 
             DrawTile(tile, topLeft);
         }

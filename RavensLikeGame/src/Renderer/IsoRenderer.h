@@ -25,6 +25,12 @@ private:
     const float tileVisibleHeight = 400;
     const int tileCount = 3;
 
+    const float tileScale = 0.5f;
+
+    inline float ScaledWidth()  const { return tileWidth * tileScale; }
+    inline float ScaledHeight()  const { return tileHeight * tileScale; }
+    inline float ScaledVisibleHeight() const { return tileVisibleHeight * tileScale; }
+
     glm::mat4 projection;
     glm::mat4 view;
 
