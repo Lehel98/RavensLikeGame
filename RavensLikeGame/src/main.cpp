@@ -7,12 +7,21 @@
 #include "Core/Globals.h"
 #include "Core/Input.h"
 #include "Core/UIRenderer.h"
-#include "Game/Character8Dir.h"
+#include "Game/Character8Direction.h"
 #include "Renderer/Shader.h"
 #include "Renderer/Camera.h"
 #include "Renderer/Texture.h"
 #include "Renderer/SpriteRenderer.h"
 #include "Renderer/IsoRenderer.h"
+
+struct DashState {
+    bool active = false;     // éppen dash-ben van-e
+    float time = 0.0f;      // eltelt idő a dash-ben
+    float cooldown = 0.0f;      // mennyi van még hátra a cooldown-ból
+    glm::vec2 start = { 0.0f, 0.0f };
+    glm::vec2 end = { 0.0f, 0.0f };
+    glm::vec2 direction = { 0.0f, 0.0f };  // normált irányvektor
+};
 
 std::string LoadShaderSource(const std::string& filePath)
 {
@@ -88,8 +97,8 @@ glm::vec2 ReadMovementVector(GLFWwindow* window)
 }
 
 // --- Fizika + animáció együtt (rövid és átlátható)
-void UpdatePlayer(GLFWwindow* window,
-    Character8Dir& player,
+void UpdatePlayerMovement(GLFWwindow* window,
+    Character8Direction& player,
     glm::vec2& playerPos,
     float playerSpeed,
     float dt)
@@ -102,7 +111,7 @@ void UpdatePlayer(GLFWwindow* window,
 // --- Játékos kirajzolása (sprite shader beállítás + render)
 void DrawPlayer(Shader& spriteShader,
     const Camera& camera,
-    Character8Dir& player,
+    Character8Direction& player,
     const glm::vec2& playerPos,
     const glm::vec2& playerSize)
 {
@@ -149,6 +158,63 @@ void DrainHealthOnKey(GLFWwindow* window, float deltaTime, int& currentHealth,
     }
 }
 
+void BeginDash(const glm::vec2& direction, const glm::vec2& currentPosition, DashState& dash)
+{
+    dash.active = true;
+    dash.time = 0.0f;
+    dash.direction = (glm::length(direction) > 0.0f) ? glm::normalize(direction) : glm::vec2(0.0f, 1.0f);
+    dash.start = currentPosition;
+    dash.end = currentPosition + dash.direction * Globals::DashDistance;
+}
+
+glm::vec2 UpdateDash(DashState& dash, float deltaTime)
+{
+    dash.time += deltaTime;
+    const float a = glm::clamp(dash.time / Globals::DashDurationInSeconds, 0.0f, 1.0f);
+    glm::vec2 pos = dash.start + (dash.end - dash.start) * a;
+
+    if (a >= 1.0f) {
+        dash.active = false;
+        dash.cooldown = Globals::DashCooldownInSeconds;
+        pos = dash.end;
+    }
+    return pos;
+}
+
+void UpdatePlayerPosition(GLFWwindow* window,
+    Character8Direction& player,
+    glm::vec2& playerPosition,
+    float playerSpeed,
+    float deltaTime,
+    DashState& dash,
+    bool& dashKeyWasDown)
+{
+    if (dash.cooldown > 0.0f)
+        dash.cooldown = std::max(0.0f, dash.cooldown - deltaTime);
+
+    const bool dashKeyDown = (glfwGetKey(window, Globals::DashKey) == GLFW_PRESS);
+    if (!dash.active && dash.cooldown <= 0.0f && dashKeyDown && !dashKeyWasDown)
+    {
+        glm::vec2 dashDirection = player.GetCurrentDirectionVector();
+        // Ha valamiért 0 lenne (állt a karakter és nincs irány), nézzen felfelé alapból
+        if (glm::dot(dashDirection, dashDirection) <= 0.0f)
+            dashDirection = glm::vec2(0.0f, 1.0f);
+
+        BeginDash(dashDirection, playerPosition, dash);
+    }
+    dashKeyWasDown = dashKeyDown;
+
+    if (dash.active)
+    {
+        playerPosition = UpdateDash(dash, deltaTime);
+        player.Update(dash.direction, deltaTime);
+    }
+    else
+    {
+        UpdatePlayerMovement(window, player, playerPosition, playerSpeed, deltaTime);
+    }
+}
+
 void BeginFrame()
 {
     glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
@@ -187,7 +253,7 @@ int main()
     glDepthFunc(GL_LEQUAL);
     glClearDepth(1.0);
 
-    // --- Shader betöltése fájlból ---
+    // Shader betöltése fájlból
     std::string vertexCode = LoadShaderSource("assets/shaders/iso.vert");
     std::string fragmentCode = LoadShaderSource("assets/shaders/iso.frag");
 
@@ -196,7 +262,7 @@ int main()
     isoShader.Use();
     isoShader.SetInt("textureAtlas", 0);
 
-    // --- Izometrikus renderer inicializálás ---
+    // Izometrikus renderer inicializálás
     IsoRenderer isoRenderer(isoShader, "assets/textures/tiles/tiles.png");
     
     glm::mat4 projection = glm::ortho(0.0f, (float)Globals::WindowWidth, 0.0f, (float)Globals::WindowHeight, -1.0f, 1.0f);
@@ -222,12 +288,15 @@ int main()
         return -1;
     }
     SpriteRenderer playerRenderer(uiShader);
-    Character8Dir player(playerSheet, playerRenderer);
+    Character8Direction player(playerSheet, playerRenderer);
 
     Camera camera((float)Globals::WindowWidth, (float)Globals::WindowHeight);
     glm::vec2 playerPosition(Globals::WindowWidth * 0.5f, Globals::WindowHeight * 0.5f);
     glm::vec2 playerSize(32.0f, 32.0f);
     const float playerSpeed = 300.0f;
+
+    DashState dash;
+    bool dashKeyWasDown = false;
 
     int maxHealth = 100, currentHealth = 100;
 
@@ -239,7 +308,7 @@ int main()
         CalculateDeltaTime(lastTime, deltaTime);
         glfwPollEvents();
 
-        UpdatePlayer(window, player, playerPosition, playerSpeed, deltaTime);
+        UpdatePlayerPosition(window, player, playerPosition, playerSpeed, deltaTime, dash, dashKeyWasDown);
 
         UpdateCameraFollow(camera, playerPosition, deltaTime);
         isoRenderer.SetView(camera.GetView());

@@ -6,20 +6,20 @@
 #include "../Renderer/SpriteRenderer.h"
 #include "../Core/Globals.h"
 
-class Character8Dir {
+class Character8Direction {
 public:
-    // 8 irány × 3 frame
-    static constexpr int kDirs = 8;
-    static constexpr int kFramesPerDir = 3;
+    static constexpr int kDirections = 8;
+    static constexpr int kFramesPerDirection = 3;
 
-    // direction indexek: 0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW
     enum Directions { N = 0, NE = 1, E = 2, SE = 3, S = 4, SW = 5, W = 6, NW = 7 };
 
-    Character8Dir(Texture& sheet, SpriteRenderer& renderer);
+    Character8Direction(Texture& sheet, SpriteRenderer& renderer);
 
     void Update(const glm::vec2& movementDir, float deltaTime);
-
     void DrawPlayer(const glm::vec2& centerPosition, const glm::vec2& pictureSize);
+
+    int GetCurrentDirection() const;
+    glm::vec2 GetCurrentDirectionVector() const;
 
 private:
     Texture& sheet;
@@ -27,14 +27,14 @@ private:
 
     float spriteSheetWidthPx = 1.0f, spriteSheetHeightPx = 1.0f;
 
-    std::array<std::array<glm::vec4, kFramesPerDir>, kDirs> uvFrames{};
+    std::array<std::array<glm::vec4, kFramesPerDirection>, kDirections> uvFrames{};
 
     inline static constexpr std::array<int, 9> kQuantizedAxesToDirectionLookUpTable = {
         SW, S, SE, W, -1, E, NW, N, NE
     };
 
-    int currentDir = S;           // kezdetben lefelé néz
-    int currentFrame = 1;         // középső frame
+    int currentDirection = S;
+    int currentFrame = 1;
     float frameTime = 0.0f;
     float frameDuration = 0.12f;  // 8–9 FPS körül
 

@@ -1,8 +1,8 @@
-﻿#include "Character8Dir.h"
+﻿#include "Character8Direction.h"
 #include <algorithm>
 #include <cmath>
 
-Character8Dir::Character8Dir(Texture& s, SpriteRenderer& r)
+Character8Direction::Character8Direction(Texture& s, SpriteRenderer& r)
     : sheet(s), renderer(r)
 {
     spriteSheetWidthPx = static_cast<float>(sheet.Width);
@@ -10,13 +10,13 @@ Character8Dir::Character8Dir(Texture& s, SpriteRenderer& r)
     BuildFramesFromGivenCoords();
 }
 
-glm::vec2 Character8Dir::NormalizeVector(const glm::vec2& v)
+glm::vec2 Character8Direction::NormalizeVector(const glm::vec2& v)
 {
     float len = std::sqrt(v.x * v.x + v.y * v.y);
     return (len > 0.0f) ? (v / len) : glm::vec2(0.0f);
 }
 
-int Character8Dir::DirectionFromMovement(const glm::vec2& v)
+int Character8Direction::DirectionFromMovement(const glm::vec2& v)
 {
     constexpr float kZeroEpsilon = 1e-4f;
 
@@ -29,7 +29,7 @@ int Character8Dir::DirectionFromMovement(const glm::vec2& v)
     return kQuantizedAxesToDirectionLookUpTable[key];
 }
 
-glm::vec4 Character8Dir::PixelRectToNormalizedUVRect(int x1, int y1, int x2, int y2, float sheetWidth, float sheetHeight)
+glm::vec4 Character8Direction::PixelRectToNormalizedUVRect(int x1, int y1, int x2, int y2, float sheetWidth, float sheetHeight)
 {
     float u0 = (x1 - 1) / sheetWidth;
     float v0 = (y1 - 1) / sheetHeight;
@@ -38,7 +38,7 @@ glm::vec4 Character8Dir::PixelRectToNormalizedUVRect(int x1, int y1, int x2, int
     return glm::vec4(u0, v0, u1, v1);
 }
 
-void Character8Dir::BuildFramesFromGivenCoords()
+void Character8Direction::BuildFramesFromGivenCoords()
 {
     // A megadott koordináták (teljes sheet mérete: 125x51 px)
     // 1) FEL (N):
@@ -82,11 +82,11 @@ void Character8Dir::BuildFramesFromGivenCoords()
     uvFrames[NW][2] = PixelRectToNormalizedUVRect(113, 36, 125, 51, spriteSheetWidthPx, spriteSheetHeightPx);
 }
 
-void Character8Dir::Update(const glm::vec2& move, float deltaTime)
+void Character8Direction::Update(const glm::vec2& move, float deltaTime)
 {
     glm::vec2 dir = NormalizeVector(move);
     int newDir = DirectionFromMovement(dir);
-    if (newDir >= 0) currentDir = newDir;
+    if (newDir >= 0) currentDirection = newDir;
 
     if (newDir < 0) {
         currentFrame = 1;
@@ -97,13 +97,34 @@ void Character8Dir::Update(const glm::vec2& move, float deltaTime)
     frameTime += deltaTime;
     while (frameTime >= frameDuration) {
         frameTime -= frameDuration;
-        currentFrame = (currentFrame + 1) % kFramesPerDir;
+        currentFrame = (currentFrame + 1) % kFramesPerDirection;
     }
 }
 
-void Character8Dir::DrawPlayer(const glm::vec2& centerPosition, const glm::vec2& pictureSize)
+void Character8Direction::DrawPlayer(const glm::vec2& centerPosition, const glm::vec2& pictureSize)
 {
-    const glm::vec4 uv = uvFrames[currentDir][currentFrame];
+    const glm::vec4 uv = uvFrames[currentDirection][currentFrame];
     glm::vec2 drawPos = centerPosition - pictureSize * 0.5f;
     renderer.DrawSpriteRegion(sheet, drawPos, pictureSize, uv);
+}
+
+int Character8Direction::GetCurrentDirection() const
+{
+    return currentDirection;
+}
+
+glm::vec2 Character8Direction::GetCurrentDirectionVector() const
+{
+    switch (currentDirection)
+    {
+        case N:  return glm::vec2(0.0f, 1.0f);
+        case NE: return glm::normalize(glm::vec2(1.0f, 1.0f));
+        case E:  return glm::vec2(1.0f, 0.0f);
+        case SE: return glm::normalize(glm::vec2(1.0f, -1.0f));
+        case S:  return glm::vec2(0.0f, -1.0f);
+        case SW: return glm::normalize(glm::vec2(-1.0f, -1.0f));
+        case W:  return glm::vec2(-1.0f, 0.0f);
+        case NW: return glm::normalize(glm::vec2(-1.0f, 1.0f));
+        default: return glm::vec2(0.0f);
+    }
 }
