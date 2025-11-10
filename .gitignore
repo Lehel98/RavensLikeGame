@@ -51,7 +51,6 @@ Desktop.ini
 # Ignore generated build directories for external libs
 Libraries/
 libs/
-external/
 x64/
 
 # Ignore backup and autosave files
