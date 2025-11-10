@@ -52,9 +52,39 @@ void SpriteRenderer::DrawSprite(const Texture& texture, const glm::vec2& positio
     glUniformMatrix4fv(glGetUniformLocation(shader.ID, "model"), 1, GL_FALSE, &model[0][0]);
 
     texture.Bind();
-    glUniform1i(glGetUniformLocation(shader.ID, "sprite"), 0); // 🟢 fontos sor
+    glUniform1i(glGetUniformLocation(shader.ID, "sprite"), 0);
     glBindVertexArray(quadVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+    texture.Unbind();
+}
+
+void SpriteRenderer::DrawSpriteRegion(const Texture& texture, const glm::vec2& position, const glm::vec2& size, const glm::vec4& uvRect)
+{
+    shader.Use();
+
+    // kamera használat UI helyett
+    glUniform1i(glGetUniformLocation(shader.ID, "useView"), 1);
+    glUniform1i(glGetUniformLocation(shader.ID, "useColorOnly"), 0);
+
+    // csak biztonság kedvéért: ha nincs textúra színezés
+    glUniform3f(glGetUniformLocation(shader.ID, "spriteColor"), 1.0f, 1.0f, 1.0f);
+
+    // al-téglalap beállítása (u0,v0,u1,v1) normált koordinátákban
+    glUniform4f(glGetUniformLocation(shader.ID, "uvRect"), uvRect.x, uvRect.y, uvRect.z, uvRect.w);
+
+    // modell mátrix (középre igazításhoz: pozíció = bal-alsó sarok)
+    glm::mat4 model(1.0f);
+    model = glm::translate(model, glm::vec3(position, 0.0f));
+    model = glm::scale(model, glm::vec3(size, 1.0f));
+    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "model"), 1, GL_FALSE, &model[0][0]);
+
+    glUniform1i(glGetUniformLocation(shader.ID, "sprite"), 0);
+    texture.Bind(0);
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
     texture.Unbind();
 }

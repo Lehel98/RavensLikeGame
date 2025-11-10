@@ -7,6 +7,7 @@
 #include "Core/Globals.h"
 #include "Core/Input.h"
 #include "Core/UIRenderer.h"
+#include "Game/Character8Dir.h"
 #include "Renderer/Shader.h"
 #include "Renderer/Camera.h"
 #include "Renderer/Texture.h"
@@ -74,19 +75,47 @@ void CalculateDeltaTime(float& lastTime, float& deltaTime)
     lastTime = currentTime;
 }
 
-glm::vec2 CalculateMovement(const glm::vec2& position, float speed, float deltaTime)
+// --- 8 irányú input vektor olvasása (GLFW billentyűkből)
+glm::vec2 ReadMovementVector(GLFWwindow* window)
 {
-    glm::vec2 movement(0.0f);
+    glm::vec2 m(0.0f);
+    if (glfwGetKey(window, Globals::KeyMoveUp) == GLFW_PRESS) m.y += 1.0f;
+    if (glfwGetKey(window, Globals::KeyMoveDown) == GLFW_PRESS) m.y -= 1.0f;
+    if (glfwGetKey(window, Globals::KeyMoveLeft) == GLFW_PRESS) m.x -= 1.0f;
+    if (glfwGetKey(window, Globals::KeyMoveRight) == GLFW_PRESS) m.x += 1.0f;
+    if (glm::length(m) > 0.0f) m = glm::normalize(m);
+    return m;
+}
 
-    if (Input::MoveUp)    movement.y += 1.0f;
-    if (Input::MoveDown)  movement.y -= 1.0f;
-    if (Input::MoveLeft)  movement.x -= 1.0f;
-    if (Input::MoveRight) movement.x += 1.0f;
-    
-    if (glm::length(movement) > 0.0f)
-        movement = glm::normalize(movement);
+// --- Fizika + animáció együtt (rövid és átlátható)
+void UpdatePlayer(GLFWwindow* window,
+    Character8Dir& player,
+    glm::vec2& playerPos,
+    float playerSpeed,
+    float dt)
+{
+    const glm::vec2 move = ReadMovementVector(window);
+    playerPos += move * playerSpeed * dt;   // pozíció frissítés
+    player.Update(move, dt);                // animáció frissítés
+}
 
-    return position + movement * speed * deltaTime;
+// --- Játékos kirajzolása (sprite shader beállítás + render)
+void DrawPlayer(Shader& spriteShader,
+    const Camera& camera,
+    Character8Dir& player,
+    const glm::vec2& playerPos,
+    const glm::vec2& playerSize)
+{
+    // ugyanazok az uniformok, mint eddig a statikus sprite-hoz
+    spriteShader.Use();
+    glUniformMatrix4fv(glGetUniformLocation(spriteShader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(spriteShader.ID, "view"), 1, GL_FALSE, &camera.GetView()[0][0]);
+    glUniform1i(glGetUniformLocation(spriteShader.ID, "useView"), 1);
+    glUniform1i(glGetUniformLocation(spriteShader.ID, "useColorOnly"), 0);
+    glUniform1i(glGetUniformLocation(spriteShader.ID, "sprite"), 0);
+
+    // a Character8Dir saját UV-t állít és rajzol; pozíciót/négyzetméretet tőled kap
+    player.DrawPlayer(playerPos, playerSize);
 }
 
 void UpdateCameraFollow(Camera& camera, const glm::vec2& playerPos, float deltaTime, float smoothness = Globals::CameraFollowSmoothness)
@@ -118,23 +147,6 @@ void DrainHealthOnKey(GLFWwindow* window, float deltaTime, int& currentHealth,
     else {
         accum = 0.0f;
     }
-}
-
-void PrepareSpriteShaderForWorld(Shader& shader, const Camera& camera)
-{
-    shader.Use();
-    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
-    glUniformMatrix4fv(glGetUniformLocation(shader.ID, "view"), 1, GL_FALSE, &camera.GetView()[0][0]);
-    glUniform1i(glGetUniformLocation(shader.ID, "useView"), 1);
-    glUniform1i(glGetUniformLocation(shader.ID, "useColorOnly"), 0);
-    glUniform1i(glGetUniformLocation(shader.ID, "sprite"), 0);
-}
-
-void DrawPlayerSprite(SpriteRenderer& renderer, const Texture& tex,
-    const glm::vec2& playerPos, const glm::vec2& size)
-{
-    const glm::vec2 drawPos = playerPos - size * 0.5f;
-    renderer.DrawSprite(tex, drawPos, size);
 }
 
 void BeginFrame()
@@ -204,16 +216,17 @@ int main()
         LoadShaderSource("assets/shaders/sprite.frag").c_str());
     UIRenderer uiRenderer(uiShader);
 
-    Texture playerTex;
-    if (!playerTex.LoadFromFile("assets/textures/player/idle.png")) {
+    Texture playerSheet;
+    if (!playerSheet.LoadFromFile("assets/textures/player/characters.png")) {
         std::cerr << "Player texture load failed!\n";
         return -1;
     }
     SpriteRenderer playerRenderer(uiShader);
+    Character8Dir player(playerSheet, playerRenderer);
 
     Camera camera((float)Globals::WindowWidth, (float)Globals::WindowHeight);
-    glm::vec2 playerPosition(0.0f, 0.0f);
-    glm::vec2 playerSize((float)playerTex.Width, (float)playerTex.Height);
+    glm::vec2 playerPosition(Globals::WindowWidth * 0.5f, Globals::WindowHeight * 0.5f);
+    glm::vec2 playerSize(32.0f, 32.0f);
     const float playerSpeed = 300.0f;
 
     int maxHealth = 100, currentHealth = 100;
@@ -226,7 +239,7 @@ int main()
         CalculateDeltaTime(lastTime, deltaTime);
         glfwPollEvents();
 
-        playerPosition = CalculateMovement(playerPosition, playerSpeed, deltaTime);
+        UpdatePlayer(window, player, playerPosition, playerSpeed, deltaTime);
 
         UpdateCameraFollow(camera, playerPosition, deltaTime);
         isoRenderer.SetView(camera.GetView());
@@ -236,8 +249,7 @@ int main()
         BeginFrame();
         RenderWorld(isoRenderer, mapData);
 
-        PrepareSpriteShaderForWorld(uiShader, camera);
-        DrawPlayerSprite(playerRenderer, playerTex, playerPosition, playerSize);
+        DrawPlayer(uiShader, camera, player, playerPosition, playerSize);
 
         RenderUI(uiRenderer, currentHealth, maxHealth);
 

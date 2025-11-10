@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Core\UIRenderer.cpp" />
+    <ClCompile Include="src\Game\Character8Dir.cpp" />
     <ClCompile Include="src\Game\TileMap.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\main.cpp" />
@@ -34,6 +35,7 @@
     <ClInclude Include="src\Core\Globals.h" />
     <ClInclude Include="src\Core\Input.h" />
     <ClInclude Include="src\Core\UIRenderer.h" />
+    <ClInclude Include="src\Game\Character8Dir.h" />
     <ClInclude Include="src\Game\TileMap.h" />
     <ClInclude Include="src\Renderer\Camera.h" />
     <ClInclude Include="src\Renderer\IsoRenderer.h" />

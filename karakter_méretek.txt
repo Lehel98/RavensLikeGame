@@ -1,0 +1,40 @@
+a teljes kép koordinátáit adom meg pixelekben számolva úgy, hogy a bal felső sarok az (1,1) koordináta úgy, hogy az első koordináta vízszintesen van, a második függőlegesen.
+3 db felfele haladó kép van:
+- 1. kép bal felső sarka (1,1), jobb alsó sarka (13,16)
+- 2. kép bal felső sarka (1,18), jobb alsó sarka (13,34)
+- 3. kép bal felső sarka (1,36), jobb alsó sarka (13,51)
+
+3 db jobb felfele haladó kép van:
+- 1. kép bal felső sarka (17,1), jobb alsó sarka (29,16)
+- 2. kép bal felső sarka (17,18), jobb alsó sarka (29,34)
+- 3. kép bal felső sarka (17,36), jobb alsó sarka (29,51)
+
+3 db jobbra haladó kép van:
+- 1. kép bal felső sarka (34,1), jobb alsó sarka (44,16)
+- 2. kép bal felső sarka (34,18), jobb alsó sarka (44,34)
+- 3. kép bal felső sarka (34,36), jobb alsó sarka (44,51)
+
+3 db jobb alsó irányba haladó kép van:
+- 1. kép bal felső sarka (48,1), jobb alsó sarka (61,16)
+- 2. kép bal felső sarka (48,18), jobb alsó sarka (61,34)
+- 3. kép bal felső sarka (48,36), jobb alsó sarka (61,51)
+
+3 db lefele irányba haladó kép van:
+- 1. kép bal felső sarka (65,1), jobb alsó sarka (77,16)
+- 2. kép bal felső sarka (65,18), jobb alsó sarka (77,34)
+- 3. kép bal felső sarka (65,36), jobb alsó sarka (77,51)
+
+3 db balra lefele irányba haladó kép van:
+- 1. kép bal felső sarka (81,1), jobb alsó sarka (93,16)
+- 2. kép bal felső sarka (81,18), jobb alsó sarka (93,34)
+- 3. kép bal felső sarka (81,36), jobb alsó sarka (93,51)
+
+3 db balra haladó kép van:
+- 1. kép bal felső sarka (98,1), jobb alsó sarka (108,16)
+- 2. kép bal felső sarka (98,18), jobb alsó sarka (108,34)
+- 3. kép bal felső sarka (98,36), jobb alsó sarka (108,51)
+
+3 db balra felfele irányba haladó kép van:
+- 1. kép bal felső sarka (113,1), jobb alsó sarka (125,16)
+- 2. kép bal felső sarka (113,18), jobb alsó sarka (125,34)
+- 3. kép bal felső sarka (113,36), jobb alsó sarka (125,51)
