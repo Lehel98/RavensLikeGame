@@ -151,3 +151,17 @@ void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
         }
     }
 }
+
+glm::vec2 IsoRenderer::ComputeMapOrigin(int rows, int cols) const
+{
+    const float width = ScaledWidth();
+    const float visH = ScaledVisibleHeight();
+
+    const float mapW = (cols + rows) * (width * 0.5f);
+    const float mapH = (cols + rows) * (visH * 0.5f);
+
+    return glm::vec2(
+        Globals::WindowWidth * 0.5f - mapW * 0.5f + width * 0.5f,
+        Globals::WindowHeight * 0.5f - mapH * 0.5f
+    );
+}

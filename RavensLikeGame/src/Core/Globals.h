@@ -3,7 +3,14 @@
 
 namespace Globals
 {
-    inline float CameraFollowSmoothness = 50.0f;
+    inline constexpr float kCameraFollowSmoothness = 50.0f;
+    inline constexpr float kPlayerFootHitboxHeightPx = 3.0f;
+	inline constexpr float kPlayerFootHitboxWidthPx = 13.0f;
+    inline constexpr float kTileWalkableWidth = 693.0f;
+    inline constexpr float kTileWalkableHeight = 400.0f;
+
+    inline constexpr float kClampBiasTilesX = 0.9f;
+    inline constexpr float kClampBiasTilesY = 0.9f;
 
     constexpr unsigned int WindowWidth = 1200;
     constexpr unsigned int WindowHeight = 800;

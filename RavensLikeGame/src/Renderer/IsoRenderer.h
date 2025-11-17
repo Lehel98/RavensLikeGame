@@ -12,8 +12,20 @@ public:
 
     void DrawMap(const std::vector<std::vector<int>>& mapData);
 
+    const glm::mat4& GetProjection() const { return projection; }
+    const glm::mat4& GetView() const { return view; }
+
     void SetProjection(const glm::mat4& projection);
     void SetView(const glm::mat4& view);
+
+    glm::vec2 ComputeMapOrigin(int rows, int cols) const;
+
+    float ScaledWidth()  const { return tileWidth * tileScale; }
+    float ScaledHeight()  const { return tileHeight * tileScale; }
+    float ScaledVisibleHeight() const { return tileVisibleHeight * tileScale; }
+
+    float GetHalfTileWidth()  const { return ScaledWidth() * 0.5f; }
+    float GetHalfTileHeight() const { return ScaledVisibleHeight() * 0.5f; }
 
 private:
     Shader& shader;
@@ -26,10 +38,6 @@ private:
     const int tileCount = 3;
 
     const float tileScale = 0.5f;
-
-    inline float ScaledWidth()  const { return tileWidth * tileScale; }
-    inline float ScaledHeight()  const { return tileHeight * tileScale; }
-    inline float ScaledVisibleHeight() const { return tileVisibleHeight * tileScale; }
 
     glm::mat4 projection;
     glm::mat4 view;

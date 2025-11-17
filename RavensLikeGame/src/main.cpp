@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 #include "Core/Globals.h"
 #include "Core/Input.h"
@@ -22,6 +23,90 @@ struct DashState {
     glm::vec2 end = { 0.0f, 0.0f };
     glm::vec2 direction = { 0.0f, 0.0f };  // normált irányvektor
 };
+
+// Egyszeri, megosztott erőforrások a rácsvonalakhoz
+static GLuint sGridVAO = 0, sGridVBO = 0;
+auto EnsureGridVAO = []() {
+    if (sGridVAO) return;
+    // Egység-rombussz (origó-középpontú), GL_LINE_LOOP-hoz 4 pont elég:
+    // (-1,0) -> (0,1) -> (1,0) -> (0,-1)
+    const float unitDiamond[8] = {
+        -1.0f,  0.0f,
+         0.0f,  1.0f,
+         1.0f,  0.0f,
+         0.0f, -1.0f
+    };
+    glGenVertexArrays(1, &sGridVAO);
+    glGenBuffers(1, &sGridVBO);
+    glBindVertexArray(sGridVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, sGridVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(unitDiamond), unitDiamond, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    };
+
+void DrawWalkableOutlines(
+    const IsoRenderer& iso,
+    const std::vector<std::vector<int>>& map,
+    Shader& lineShader,            // a sprite/UI shadered jó, csak színes módra tedd
+    const glm::vec3& lineColor = glm::vec3(1.0f),
+    float lineWidth = 1.0f)
+{
+    glDisable(GL_DEPTH_TEST);
+    EnsureGridVAO();
+
+    const int rows = static_cast<int>(map.size());
+    const int cols = static_cast<int>(map[0].size());
+
+    // Ugyanaz a P/V, mint a tile-oknál → semmilyen “úszás”
+    lineShader.Use();
+    glUniformMatrix4fv(glGetUniformLocation(lineShader.ID, "projection"), 1, GL_FALSE, &iso.GetProjection()[0][0]);
+    glUniformMatrix4fv(glGetUniformLocation(lineShader.ID, "view"), 1, GL_FALSE, &iso.GetView()[0][0]);
+
+    // Ez a shaderedben azt jelenti: egyszínű rajz (ne textúrát mintázzon)
+    glUniform1i(glGetUniformLocation(lineShader.ID, "useView"), 1);
+    glUniform1i(glGetUniformLocation(lineShader.ID, "useColorOnly"), 1);
+    glUniform3f(glGetUniformLocation(lineShader.ID, "spriteColor"),
+        lineColor.r, lineColor.g, lineColor.b);
+
+    glLineWidth(lineWidth);
+
+    // Ugyanaz az origó és félméretek, mint az IsoRenderer-ben
+    const float halfW = iso.ScaledWidth() * 0.5f;  // 693*scale/2
+    const float halfH = iso.ScaledVisibleHeight() * 0.5f;  // 400*scale/2
+    const glm::vec2 origin = iso.ComputeMapOrigin(rows, cols);
+
+    const glm::vec2 worldBias(
+        (Globals::kClampBiasTilesX - Globals::kClampBiasTilesY) * halfW,
+        (Globals::kClampBiasTilesX + Globals::kClampBiasTilesY) * halfH
+    );
+
+    glBindVertexArray(sGridVAO);
+
+    // Minden tile közepére: model = T(center) * S(halfW,halfH,1)
+    for (int r = 0; r < rows; ++r)
+    {
+        for (int c = 0; c < cols; ++c)
+        {
+            // Tile-közép (ugyanaz a képlet, mint a csempéknél)
+            const glm::vec2 center(
+                origin.x + (c - r) * halfW,
+                origin.y + (c + r) * halfH
+            );
+
+            glm::mat4 model(1.0f);
+            model = glm::translate(model, glm::vec3(center + worldBias, 0.0f));
+            model = glm::scale(model, glm::vec3(halfW, halfH, 1.0f));
+            glUniformMatrix4fv(glGetUniformLocation(lineShader.ID, "model"), 1, GL_FALSE, &model[0][0]);
+
+            glDrawArrays(GL_LINE_LOOP, 0, 4);
+        }
+    }
+
+    glBindVertexArray(0);
+}
 
 std::string LoadShaderSource(const std::string& filePath)
 {
@@ -115,6 +200,7 @@ void DrawPlayer(Shader& spriteShader,
     const glm::vec2& playerPos,
     const glm::vec2& playerSize)
 {
+    glEnable(GL_DEPTH_TEST);
     // ugyanazok az uniformok, mint eddig a statikus sprite-hoz
     spriteShader.Use();
     glUniformMatrix4fv(glGetUniformLocation(spriteShader.ID, "projection"), 1, GL_FALSE, &camera.GetProjection()[0][0]);
@@ -123,12 +209,13 @@ void DrawPlayer(Shader& spriteShader,
     glUniform1i(glGetUniformLocation(spriteShader.ID, "useColorOnly"), 0);
     glUniform1i(glGetUniformLocation(spriteShader.ID, "sprite"), 0);
 
-    // a Character8Dir saját UV-t állít és rajzol; pozíciót/négyzetméretet tőled kap
+    // a Character8Direction saját UV-t állít és rajzol; pozíciót/négyzetméretet tőled kap
     player.DrawPlayer(playerPos, playerSize);
 }
 
-void UpdateCameraFollow(Camera& camera, const glm::vec2& playerPos, float deltaTime, float smoothness = Globals::CameraFollowSmoothness)
+void UpdateCameraFollow(Camera& camera, const glm::vec2& playerPos, float deltaTime)
 {
+    float smoothness = Globals::kCameraFollowSmoothness;
     const glm::vec2 halfViewport(Globals::WindowWidth * 0.5f, Globals::WindowHeight * 0.5f);
     const glm::vec2 target = playerPos - halfViewport;
 
@@ -233,6 +320,70 @@ void RenderUI(UIRenderer& ui, int currentHealth, int maxHealth)
     ui.DrawHealthBar(currentHealth, maxHealth);
 }
 
+// L1 "rombusz peremre" való klampelés
+glm::vec2 ClampLocalToDiamond(glm::vec2 local)
+{
+    const float halfW = Globals::kTileWalkableWidth * 0.5f;
+    const float halfH = Globals::kTileWalkableHeight * 0.5f;
+
+    float ax = std::abs(local.x) / halfW;
+    float ay = std::abs(local.y) / halfH;
+    float s = ax + ay;
+    if (s <= 1.0f) return local;
+
+    float scale = 1.0f / s;
+    local.x = (local.x >= 0 ? 1.0f : -1.0f) * ax * scale * halfW;
+    local.y = (local.y >= 0 ? 1.0f : -1.0f) * ay * scale * halfH;
+    return local;
+}
+
+void ClampPlayerToMapBoundsDiamond(
+    glm::vec2& playerCenterPosition,
+    const glm::vec2& playerSize,
+    const IsoRenderer& iso,
+    int rows, int cols)
+{
+    // --- beállítások ---
+    const float footH = Globals::kPlayerFootHitboxHeightPx;      // láb „magasság” a sprite alján
+    const float halfHit = Globals::kPlayerFootHitboxWidthPx * 0.5f; // vízszintes fél-szélesség (pl. 6.5 a 13px-hez)
+
+    // --- 1) sprite-középpont -> lábpont (világ) ---
+    glm::vec2 feet = playerCenterPosition - glm::vec2(0.0f, playerSize.y * 0.5f - footH);
+
+    // --- 2) előkészített méretek és origó (pontosan mint a rajzolásnál) ---
+    const float halfW = iso.ScaledWidth() * 0.5f;          // 693 * scale / 2
+    const float halfH = iso.ScaledVisibleHeight() * 0.5f;  // 400 * scale / 2
+    const glm::vec2 O = iso.ComputeMapOrigin(rows, cols);
+
+    // belső kis segéd-blokk (NEM függvény): egy konkrét lábpont klampelése a pálya „rombusz” határára
+    auto clampOneSide = [&](float dx) -> glm::vec2 {
+        const float X = (feet.x + dx) - O.x;
+        const float Y = feet.y - O.y;
+
+        float gx = 0.5f * ((X / halfW) + (Y / halfH));
+        float gy = 0.5f * ((Y / halfH) - (X / halfW));
+
+        gx -= Globals::kClampBiasTilesX; gy -= Globals::kClampBiasTilesY;
+        gx = std::clamp(gx, -0.5f, static_cast<float>(cols) - 0.5f);
+        gy = std::clamp(gy, -0.5f, static_cast<float>(rows) - 0.5f);
+        gx += Globals::kClampBiasTilesX; gy += Globals::kClampBiasTilesY;
+
+        const float Xc = (gx - gy) * halfW;
+        const float Yc = (gx + gy) * halfH;
+        return { O.x + Xc, O.y + Yc };
+        };
+
+    // --- 3) 13px széles talp: bal és jobb szélt külön klampeljük ---
+    const glm::vec2 leftFeet = clampOneSide(-halfHit);
+    const glm::vec2 rightFeet = clampOneSide(+halfHit);
+
+    // --- 4) középre visszaátlagolunk, így a teljes 13px bent marad ---
+    feet = 0.5f * (leftFeet + rightFeet);
+
+    // --- 5) lábpont -> sprite-középpont ---
+    playerCenterPosition = feet + glm::vec2(0.0f, playerSize.y * 0.5f - footH);
+}
+
 int main()
 {
     if (!glfwInit())
@@ -271,10 +422,8 @@ int main()
     isoRenderer.SetView(view);
 
     std::vector<std::vector<int>> mapData = {
-        { 0, 1, 2, 0 },
-        { 1, 2, 0, 0 },
-        { 2, 0, 1, 0 },
-        { 0, 0, 0, 0 }
+        { 0, 0, 1 },
+        { 0, 0, 0 }
     };
 
     Shader uiShader(
@@ -291,7 +440,14 @@ int main()
     Character8Direction player(playerSheet, playerRenderer);
 
     Camera camera((float)Globals::WindowWidth, (float)Globals::WindowHeight);
-    glm::vec2 playerPosition(Globals::WindowWidth * 0.5f, Globals::WindowHeight * 0.5f);
+
+    int centerTileX = static_cast<int>(mapData[0].size() / 2);
+    int centerTileY = static_cast<int>(mapData.size() / 2);
+
+    float worldX = (centerTileX - centerTileY) * (isoRenderer.ScaledWidth() * 0.5f);
+    float worldY = (centerTileX + centerTileY) * (isoRenderer.ScaledVisibleHeight() * 0.5f);
+
+    glm::vec2 playerPosition(worldX, worldY);
     glm::vec2 playerSize(32.0f, 32.0f);
     const float playerSpeed = 300.0f;
 
@@ -303,12 +459,17 @@ int main()
     float lastTime = glfwGetTime();
     float deltaTime = 0.0f;
 
+    const int mapWidth = static_cast<int>(mapData[0].size());
+    const int mapHeight = static_cast<int>(mapData.size());
+
     while (!glfwWindowShouldClose(window))
     {
         CalculateDeltaTime(lastTime, deltaTime);
         glfwPollEvents();
 
         UpdatePlayerPosition(window, player, playerPosition, playerSpeed, deltaTime, dash, dashKeyWasDown);
+
+        ClampPlayerToMapBoundsDiamond(playerPosition, playerSize, isoRenderer, mapHeight, mapWidth);
 
         UpdateCameraFollow(camera, playerPosition, deltaTime);
         isoRenderer.SetView(camera.GetView());
@@ -317,6 +478,8 @@ int main()
 
         BeginFrame();
         RenderWorld(isoRenderer, mapData);
+
+        DrawWalkableOutlines(isoRenderer, mapData, uiShader, glm::vec3(1.0f), 1.0f);
 
         DrawPlayer(uiShader, camera, player, playerPosition, playerSize);
 
