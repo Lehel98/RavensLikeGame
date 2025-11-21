@@ -12,8 +12,8 @@ namespace Globals
     inline constexpr float kClampBiasTilesX = 0.9f;
     inline constexpr float kClampBiasTilesY = 0.9f;
 
-    constexpr unsigned int WindowWidth = 1200;
-    constexpr unsigned int WindowHeight = 800;
+    constexpr unsigned int WindowWidth = 1600;
+    constexpr unsigned int WindowHeight = 900;
     constexpr const char* WindowTitle = "RavensLikeGame";
 
     inline float DashDistance = 180.0f;

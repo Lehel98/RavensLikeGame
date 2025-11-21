@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "Shader.h"
+#include <array>
 #include <glm.hpp>
 #include <string>
 #include <vector>
@@ -20,24 +21,25 @@ public:
 
     glm::vec2 ComputeMapOrigin(int rows, int cols) const;
 
-    float ScaledWidth()  const { return tileWidth * tileScale; }
-    float ScaledHeight()  const { return tileHeight * tileScale; }
-    float ScaledVisibleHeight() const { return tileVisibleHeight * tileScale; }
+    float ScaledWidth()  const { return kTileWidth * kTileScale; }
+    float ScaledHeight()  const { return kTileHeight * kTileScale; }
+    float ScaledVisibleHeight() const { return kTileVisibleHeight * kTileScale; }
 
     float GetHalfTileWidth()  const { return ScaledWidth() * 0.5f; }
     float GetHalfTileHeight() const { return ScaledVisibleHeight() * 0.5f; }
 
 private:
+    std::array<glm::vec4, 4> tileUvRects;
+
     Shader& shader;
     unsigned int vao, vbo;
     unsigned int textureID;
 
-    const float tileWidth = 693;
-    const float tileHeight = 560;
-    const float tileVisibleHeight = 400;
-    const int tileCount = 3;
-
-    const float tileScale = 0.5f;
+    static constexpr float kTileWidth = 693;
+    static constexpr float kTileHeight = 560;
+    static constexpr float kTileVisibleHeight = 400;
+    static constexpr int kTileCount = 4;
+    static constexpr float kTileScale = 0.5f;
 
     glm::mat4 projection;
     glm::mat4 view;

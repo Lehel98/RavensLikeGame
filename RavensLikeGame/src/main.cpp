@@ -47,10 +47,34 @@ auto EnsureGridVAO = []() {
     glBindVertexArray(0);
     };
 
+void CenterWindowOnPrimary(GLFWwindow* window) {
+    GLFWmonitor* mon = glfwGetPrimaryMonitor();
+    if (!mon || !window) return;
+
+    int ww, wh;
+    glfwGetWindowSize(window, &ww, &wh);
+
+    int ax = 0, ay = 0, aw = 0, ah = 0;
+    if (glfwGetMonitorWorkarea) {
+        glfwGetMonitorWorkarea(mon, &ax, &ay, &aw, &ah);
+        int x = ax + (aw - ww) / 2;
+        int y = ay + (ah - wh) / 2;
+        glfwSetWindowPos(window, x, y);
+        return;
+    }
+
+    int mx = 0, my = 0;
+    glfwGetMonitorPos(mon, &mx, &my);
+    const GLFWvidmode* mode = glfwGetVideoMode(mon);
+    int x = mx + (mode->width - ww) / 2;
+    int y = my + (mode->height - wh) / 2;
+    glfwSetWindowPos(window, x, y);
+}
+
 void DrawWalkableOutlines(
     const IsoRenderer& iso,
     const std::vector<std::vector<int>>& map,
-    Shader& lineShader,            // a sprite/UI shadered jó, csak színes módra tedd
+    Shader& lineShader,
     const glm::vec3& lineColor = glm::vec3(1.0f),
     float lineWidth = 1.0f)
 {
@@ -156,6 +180,8 @@ GLFWwindow* CreateGameWindow()
         glfwTerminate();
         return nullptr;
     }
+
+    CenterWindowOnPrimary(window);
 
     glfwMakeContextCurrent(window);
     glfwSetKeyCallback(window, Input::KeyCallback);
@@ -422,8 +448,11 @@ int main()
     isoRenderer.SetView(view);
 
     std::vector<std::vector<int>> mapData = {
-        { 0, 0, 1 },
-        { 0, 0, 0 }
+        { 0, 1, 2, 3, 0, 3, 0, 3, 0, 3 },
+        { 0, 2, 3, 0, 0, 0, 3, 0, 3, 0 },
+        { 0, 3, 0, 1, 0, 3, 0, 3, 0, 3 },
+        { 0, 0, 1, 2, 0, 0, 3, 0, 3, 0 },
+        { 0, 3, 0, 3, 0, 3, 0, 3, 0, 3 }
     };
 
     Shader uiShader(
@@ -479,7 +508,7 @@ int main()
         BeginFrame();
         RenderWorld(isoRenderer, mapData);
 
-        DrawWalkableOutlines(isoRenderer, mapData, uiShader, glm::vec3(1.0f), 1.0f);
+        //DrawWalkableOutlines(isoRenderer, mapData, uiShader, glm::vec3(1.0f), 1.0f);
 
         DrawPlayer(uiShader, camera, player, playerPosition, playerSize);
 

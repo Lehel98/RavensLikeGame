@@ -15,6 +15,13 @@ IsoRenderer::IsoRenderer(Shader& shader, const std::string& texturePath)
 
     projection = glm::mat4(1.0f);
     view = glm::mat4(1.0f);
+
+    const float atlasPixelWidth = static_cast<float>(kTileWidth * kTileCount);
+    for (int i = 0; i < kTileCount; ++i) {
+        const float uMin = (i * kTileWidth) / atlasPixelWidth;
+        const float uMax = ((i + 1) * kTileWidth) / atlasPixelWidth;
+        tileUvRects[i] = glm::vec4(uMin, 0.0f, uMax, 1.0f);
+    }
 }
 
 IsoRenderer::~IsoRenderer()
@@ -90,8 +97,29 @@ void IsoRenderer::InitRenderData()
     glBindVertexArray(0);
 }
 
-void IsoRenderer::DrawTile(int tileIndex, const glm::vec2& worldPosition)
+void IsoRenderer::DrawTile(int tileIndex, const glm::vec2& worldPos)
 {
+    shader.SetVec4("uvRect", tileUvRects[tileIndex]);
+
+    glm::mat4 model(1.0f);
+    model = glm::translate(model, glm::vec3(worldPos.x, worldPos.y, 0.0f));
+    shader.SetMat4("model", model);
+
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
+
+void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
+{
+    const int rows = static_cast<int>(mapData.size());
+    const int cols = static_cast<int>(mapData[0].size());
+
+    const float width = ScaledWidth();
+    const float visH = ScaledVisibleHeight();
+    const float halfW = width * 0.5f;
+    const float halfVisH = visH * 0.5f;
+
+    const glm::vec2 origin = ComputeMapOrigin(rows, cols);
+
     shader.Use();
     shader.SetMat4("projection", projection);
     shader.SetMat4("view", view);
@@ -99,57 +127,27 @@ void IsoRenderer::DrawTile(int tileIndex, const glm::vec2& worldPosition)
     glBindTexture(GL_TEXTURE_2D, textureID);
     glBindVertexArray(vao);
 
-    const float atlasPixelWidth = (float)(tileWidth * tileCount);
-
-    const float textureUStart = (tileIndex * tileWidth) / atlasPixelWidth;
-    const float textureUEnd = ((tileIndex + 1) * tileWidth) / atlasPixelWidth;
-    const float textureVStart = 0.0f;
-    const float textureVEnd = 1.0f;
-    shader.SetVec4("uvRect", glm::vec4(textureUStart, textureVStart, textureUEnd, textureVEnd));
-
-    glm::mat4 model(1.0f);
-    model = glm::translate(model, glm::vec3(worldPosition.x, worldPosition.y, 0.0f));
-    shader.SetMat4("model", model);
-
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
-}
-
-void IsoRenderer::DrawMap(const std::vector<std::vector<int>>& mapData)
-{
-    const int rows = (int)mapData.size();
-    const int cols = (int)mapData[0].size();
-
-	const float width = ScaledWidth();
-	const float visibleHeight = ScaledVisibleHeight();
-
-    // Térkép középre igazítása (rombusz-tetők befoglalója alapján)
-    const float mapWidth = (cols + rows) * (width * 0.5f);
-    const float mapHeight = (cols + rows) * (visibleHeight * 0.5f);
-    const glm::vec2 origin(
-        Globals::WindowWidth * 0.5f - mapWidth * 0.5f + width * 0.5f,
-        Globals::WindowHeight * 0.5f - mapHeight * 0.5f
-    );
-
-    const int maxS = rows + cols - 2;
-    for (int s = maxS; s >= 0; --s)
-    {
-        const int xBeg = std::max(0, s - (rows - 1));
-        const int xEnd = std::min(cols - 1, s);
-
-        for (int x = xEnd; x >= xBeg; --x)
-        {
-            const int y = s - x;
-            const int tile = mapData[y][x];
+    const int maxS = (rows - 1) + (cols - 1);
+    for (int s = maxS; s >= 0; --s) {
+        int xStart = std::max(0, s - (rows - 1));
+        int xEnd = std::min(cols - 1, s);
+        for (int x = xEnd; x >= xStart; --x) {
+            int y = s - x;
+            int tile = mapData[y][x];
             if (tile < 0) continue;
 
-            const float apexX = origin.x + (x - y) * (width * 0.5f);
-            const float apexY = origin.y + (x + y) * (visibleHeight * 0.5f);
-            const glm::vec2 topLeft(apexX - width * 0.5f, apexY);
+            // tető (apex) helye
+            const float apexX = origin.x + (x - y) * halfW;
+            const float apexY = origin.y + (x + y) * halfVisH;
+
+            // quad bal-felső sarka (innen rajzol a quad lefelé)
+            const glm::vec2 topLeft(apexX - halfW, apexY);
 
             DrawTile(tile, topLeft);
         }
     }
+
+    glBindVertexArray(0);
 }
 
 glm::vec2 IsoRenderer::ComputeMapOrigin(int rows, int cols) const
